@@ -10,7 +10,7 @@
 \usepackage[nonamebreak,square]{natbib}
 
 <<style, eval=TRUE, echo=FALSE, results="asis">>=
-BiocStyle::latex(width=78, bibstyle=NA)
+BiocStyle::latex(width=78, use.unsrturl=FALSE)
 @
 
 <<echo=FALSE>>=

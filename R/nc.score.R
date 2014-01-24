@@ -43,6 +43,7 @@ function(
 			
 
 			nc.score.result = nc.score.vectors.helper(x.discretized,y.discretized)		#Invoke the function
+
 			CA$nc.score.result <- nc.score.result		#Post the result
 			if (CA$verbose == TRUE)
 				{return(CA)}
@@ -65,7 +66,6 @@ function(
 
     x.discretized <- CA$x.discretized				#Get it from Common Area
 
- 
  
  
 	for (i in seq_len(ncol(x)))												#Loop on the columns of the first matrix
@@ -142,5 +142,6 @@ function(
 		{
 		CA <- CA$nc.score.matrix	#just post the resulting matrix
 		}
+
 return(CA)
 }

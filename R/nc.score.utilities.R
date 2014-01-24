@@ -62,12 +62,15 @@ function(
 #*  	nc.score.helper                                                              *
 #*************************************************************************************
    	x,						#First discretized  input 
-	y)						#Second discretized input 
+	y,						#Second discretized input 
+	CA)						#Common area
 {
 	ijsum <- 0				#Reset ijsum
 	cosum <- 0				#Reset cosum
 	cesum <- 0				#Reset cesum
+
 	n <- length(unique(c(x,y)))
+
 	adj <- ((1.5)*n*(n-1)/(n^2-n+1))    
 	#**************************************************************
 	# Vectorized the calculations                                 *

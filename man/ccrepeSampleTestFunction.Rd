@@ -4,26 +4,19 @@
  ccrepeSampleTestFunction - Simple example of a test measurent function to be used with ccrepe       
 }
 \description{
-
-  This simple example of a test measurent function to be used with
-  ccrepe used in the same fashion that cor would be used Some properties
-  of the function:
-  \enumerate{
- 
-    \item Be able to take either two inputs which are vectors or one
-    input which is either a matrix or a data frame
-
-    \item In the case of one input, return a matrix in which the (i,j)th
-    entry is the similarity score for column i and column j in the
-    original matrix
-
-    \item Resulting matrix must be symmetric
-
-    \item The inputs must be named x and y
-  }
+This  simple example of a test measurent function to be used with ccrepe\cr       
+ used in the same fashion that cor would be used \cr                                  
+ Some properties of the function:  \cr                                                
+ 1. Be able to take either two inputs which are vectors or one input which  \cr       
+ is either a matrix or a data frame  \cr                                            
+ 3.In the case of one input, return a matrix in which the (i,j)th entry  \cr          
+   is the similarity score for column i and column j in the original matrix \cr        
+ 4.Resulting matrix must be symmetric \cr                                              
+ 5.The inputs must be named x and y \cr   
 }
-
-\usage{ ccrepeSampleTestFunction(x, y = NA) }
+\usage{
+ccrepeSampleTestFunction(x, y = NA)
+}
 %- maybe also 'usage' for other objects documented here.
 \arguments{
   \item{x}{

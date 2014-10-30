@@ -1,213 +1,191 @@
-nc.score.helper <- function(data,CA) {
-	#****************************************************************************************
-	#*   Core calculations                                                                  *
-	#****************************************************************************************
-	mode(data) <- "numeric"
-	CA$nc.score.matrix <- matrix(nrow=ncol(data),ncol=ncol(data))		#Build results area
-	
-	#***********************************************************
-	#*  Vectorizing the calculations                           *
-	#*  Calculating  looking at the matrix as a collection     *
-	#*   of n_columns column vectors and performing the        *
-	#*   calculations for the appropriate columns              *
-	#***********************************************************
-	
-
-	for( i in seq_len(ncol(data)) ) 
-	{  
-		for( j in (i):(ncol(data)) ) 
-		{
-                        x <- data[,i]
-			y <- data[,j]
-                        n.bins <- length(unique(c(x,y)))
-                        adj <- ((1.5)*n.bins*(n.bins-1)/(n.bins^2-n.bins+1))
-			ri0 <- seq_len(length(x))
-			rj0 <- Map(seq, ri0, length(y))
-			ri <- rep(ri0, sapply(rj0, length))
-			rj <- unlist(rj0)
-			cosum <- sum(((x[ri]<x[rj])&(y[ri]<y[rj])) | ((x[ri]>x[rj])&(y[ri]>y[rj])))
-			cesum <- sum(((x[ri]>x[rj])&(x[rj]<y[rj])& (y[rj]>y[ri])&(y[ri]<x[ri])) | ((x[ri]<x[rj])&(x[rj]>y[rj])& (y[rj]<y[ri])&(y[ri]>x[ri])))
-			cesum_adj <- cesum * adj			
-			ijsum <- (cosum - cesum_adj)
-                        score <- nc.score.renormalize(x,y,ijsum)                        #Normalize the result
-			CA$nc.score.matrix[i,j] <- score				#Post it to the matrix
-			CA$nc.score.matrix[j,i] <- score				#Post it to the matrix
-		}
-	}
-	return(CA$nc.score.matrix)
+Bin <- function(u,nbins,bin.cutoffs) {
+    if(!is.null(nbins)){
+        if (length(u) == 0L)
+            u
+        else if (is.matrix(u)) {
+            if (nrow(u) > 1L)
+                as.matrix(discretize(u,nbins=nbins))
+            else as.matrix(discretize(u,nbins=nbins))
+        }
+        else discretize(u,nbins=nbins)[,1]
+    } else if (!is.null(bin.cutoffs)){
+        if (length(u) == 0L)
+            u
+        else if (is.matrix(u)){
+            if(nrow(u) > 1L)
+                apply(u,2,findInterval,vec=bin.cutoffs)
+            else matrix( apply(u,2,findInterval,vec=bin.cutoffs),nrow=1 )
+        }
+        else findInterval(u,vec=bin.cutoffs)
+    }
 }
 
-
-
-nc.score.renormalize <-
-function(
-#*************************************************************************************
-#*  	nc.score.renormalize                                                         *
-#*************************************************************************************
-   	x,						#First discretized entity 
-	y,						#Second discretized entity
-	nc.score.result)					  
-{
-	NS	<- nrow(as.matrix(x))										#Number of Samples
-	NB 	<-   length(unique(c(x,y)))									#Number of bins
-	renormalization.factor <-  choose(NS, 2) - (NS %% NB) * choose((floor(NS/NB) + 1), 2) - (NB - NS %% NB) * choose(floor(NS/NB), 2)
-	if  (renormalization.factor == 0) 								#So that we dont get NaNs
-		{renormalization.factor =  1} 		
-	nc.score.result <- nc.score.result  / renormalization.factor	#Normalize
-	return(nc.score.result)
-}
-nc.score.vectors.helper <-
-function(
-#*************************************************************************************
-#*  	nc.score.helper                                                              *
-#*************************************************************************************
-   	x,						#First discretized  input 
-	y,						#Second discretized input 
-	CA)						#Common area
-{
-	ijsum <- 0				#Reset ijsum
-	cosum <- 0				#Reset cosum
-	cesum <- 0				#Reset cesum
-
-	n <- length(unique(c(x,y)))
-
-	adj <- ((1.5)*n*(n-1)/(n^2-n+1))    
-	#**************************************************************
-	# Vectorized the calculations                                 *
-	#**************************************************************
-	i0 <- seq_len(length(x) - 1)
-    j0 <- Map(seq, i0 + 1, length(y))
-    i <- rep(i0, sapply(j0, length))
-    j <- unlist(j0)
-    cosum <- sum(((x[i]<x[j])&(y[i]<y[j])) | ((x[i]>x[j])&(y[i]>y[j])))
-    cesum <- sum(((x[i]>x[j])&(x[j]<y[j])& (y[j]>y[i])&(y[i]<x[i])) |   ((x[i]<x[j])&(x[j]>y[j])& (y[j]<y[i])&(y[i]>x[i])))
-	cesum_adj <- cesum * adj			
-	ijsum <- (cosum - cesum_adj)
-        score <- nc.score.renormalize(x,y,ijsum)
-	return(score)				
-}
 preprocess_nc_score_input <-
 function(
 #********************************************************************************************
 #*  	Pre process input and build the common area                                         *
 #********************************************************************************************
-			x, 										#First Input
-			input.bins,
-			input.min.abundance,
-			input.min.samples)
+    x,
+    y,
+    na.method,
+    nbins,
+    bin.cutoffs
+    )
 {
+      if (is.na(na.method))
+          stop("invalid 'use' argument")
+      if (is.data.frame(y))
+          y <- as.matrix(y)
+      if (is.data.frame(x))
+          x <- as.matrix(x)
+      if (!is.matrix(x) && is.null(y))
+          stop("supply both 'x' and 'y' or a matrix-like 'x'")
+      if (!(is.numeric(x) || is.logical(x)))
+          stop("'x' must be numeric")
+      stopifnot(is.atomic(x))
+      if (!is.null(y)) {
+          if (!(is.numeric(y) || is.logical(y)))
+              stop("'y' must be numeric")
+          stopifnot(is.atomic(y))
+      }
+      if(!is.null(nbins) && !is.null(bin.cutoffs)){
+          stop("supply only one of 'nbins' or 'bin.cutoffs'")
+      }
+      if(!is.null(nbins) && !is.numeric(nbins)){
+          stop("supply a numeric bin number")
+      }
+      if(!is.null(nbins) && length(nbins) > 1L){
+          warning("nbins has length > 1 and only the first element will be used")
+          nbins <- nbins[1]
+      }
+      if(!is.null(nbins) && nbins <= 0){
+          stop("supply a positive bin number")
+      }
+      if(!is.null(nbins) && (nbins %% 1 != 0)){
+          stop("supply an integer bin number")
+      }
+      if(!is.null(bin.cutoffs) && !is.numeric(bin.cutoffs)){
+          stop("invalid bin cutoff values")
+      }
+      if(!is.null(bin.cutoffs) && sum(sort(bin.cutoffs)!=bin.cutoffs)>0){
+          warning("bin.cutoffs not monotonically ordered - using sorted values")
+          bin.cutoffs <- sort(bin.cutoffs)
+      }
+      if(is.null(nbins) && is.null(bin.cutoffs)){
+          if(is.matrix(x)){
+              nbins <- floor(sqrt(nrow(x)))
+          } else {
+              nbins <- floor(sqrt(length(x)))
+          }
+      }
+      return(list(
+          x=x,
+          y=y,
+          nbins=nbins,
+          bin.cutoffs=bin.cutoffs
+          ))
 
-	CA <-list()												#Common area definition 	 
-  	if (!suppressWarnings(!is.na(as.numeric(input.min.abundance))))	#check if the User entered a valid threshold1
-		{
-		cat('\nInvalid min.abundance entered - using default=0.0001\n')
-		CA$min.abundance = 0.0001
-		 }				#If it is not valid - force default
-	else
-		{CA$min.abundance = input.min.abundance}	#Else - use it
+}
 
-	if (!suppressWarnings(!is.na(as.numeric(input.min.samples))))	#check if the User entered a valid threshold1
-		{
-		cat('\nInvalid min.samples entered - using default=0.1\n')
-		CA$min.samples = 0.1 				#If it is not valid - force default
-		}
-	else
-		{CA$min.samples = input.min.samples}	#Else - use it
+process_wrapper_input <- function(CA,
+                                     input.min.abundance,
+                                     input.min.samples){
+        CA <-list()		
+	CA <- process_min_abundance_min_samples( CA,                  #Process minimum abundance and min samples
+			input.min.abundance,
+			input.min.samples)								 
+
  
- 
-
 	#*********************************************************
 	#* Filter                                                *
 	#*********************************************************
-	CA$x <- x												#Post x in the common area
-	CA <-qc_filter(x,CA)										#filter by abundance thresholds
-	x <-na.omit(CA$x)											#remove NAs
-	if (is.null(rownames(x))) {rownames(x)<-seq(1:nrow(x))} #If there are no row names - plug them in
-	CA$x <-  x 												#Post it to common Area
- 	CA$x.discretized <- matrix(nrow=nrow(CA$x),ncol=ncol(CA$x))			#Build x Discretized empty Matrix			
-	#****************************************************************************************
-	#*   Process Bins  passed by the user  or set default                                   *
-	#****************************************************************************************
-	CA <- process.input.bins(input.bins, CA)			#Process Input number of bins or set default
-	
+        CA <- qc_filter('x',CA)
+        CA <- qc_filter('y',CA)
+
 	return(CA)
+
 }
 
+qc_filter <- function(var_name,CA){
+    var_values <- CA[[var_name]]
+    if(is.vector(var_values)){
+        non.miss <- var_values[-which(is.na(var_values))]
+        if( sum( non.miss >= CA$min.abundance ) <= CA$min.samples*length(non.miss) ){
+            stop(paste0(
+                "'",var_name,"' has ",
+                100*(sum(non.miss >= CA$min.abundance)/length(non.miss)),
+                "% of non-missing samples with abundance less than min.abundance=",
+                CA$min.abundance
+                ))
+        } else {
+            CA[[paste0(var_name,".filtered")]] <- var_values
+            CA[[paste0(var_name,".features.filtered")]] <- c()
+        }
+    } else if (is.matrix(var_values) || is.data.frame(var_values)){
+        CA[[paste0(var_name,".features.filtered")]] <- which(
+            apply(x,2,
+                  function(col){
+                      sum(col[which(!is.na(col))] >= CA$min.abundance)/length(col[which(!is.na(col))])
+                  }
+                  ) <= CA$min.samples
+            )
+        if(length(CA[[paste0(var_name,".features.filtered")]])==ncol(var_values)){
+            stop(paste0(
+                "'",var_name,"' has 0 features which have 100*min.samples=",
+                100*CA$min.samples,"% of samples with abundances >=",
+                CA$min.abundance, "(min.abundance)."
+                ))
+        }
+        CA[[paste0(var_name,".filtered")]] <- var_values[,-CA[[paste0(var_name,".features.filtered")]]]
+    } else if (is.null(var_values)){ 
+        CA[[paste0(var_name,".filtered")]] <- var_values
+        CA[[paste0(var_name,".features.filtered")]] <- c()
+    } else {
+        stop(paste0("Unrecognized input type for variable '",var_name,"'"))
+    }
+    return(CA)
+    
+}
 
-
-process.input.bins <-
-function(input.bins, CA)
+process_min_abundance_min_samples <-function(   CA,
+			input.min.abundance,
+			input.min.samples)
 #********************************************************************************************
-#*  	Preprocess input bins as passed by the user or use default                          *
+#*  	Process minimum abundance and input samples                                         *
 #********************************************************************************************
 {
-	if (length(input.bins) > 1)					#If the user passed a set of bins,  sort them and use them
+ 	if (!is.numeric(input.min.abundance))	#check if the User entered a valid threshold1
 		{
-			CA$bins <- sort(input.bins)
-			CA$n.bins <- length(intersect(which(CA$bins<1),which(CA$bins>0)))
-			if (! 0 %in% CA$bins )				#Check if 0 is in the list of the bins the User passed - not there - add it and sort 
-				{ 
-				 CA$bins<-c(CA$bins,0)			#Add 0
-				 CA$bins <- sort(CA$bins)		#And sort it
-				 CA$n.bins <- length(intersect(which(CA$bins<1),which(CA$bins>0)))  # The number of bins, since 1 and 0 represent the ends
-				}
-			return(CA)
-		}
-		
-	if (class(CA$x) == "numeric") 
+		warning('\nMinimum abundance must be numeric - using default=0.0001\n')
+		CA$min.abundance = 0.0001
+		 }				#If it is not valid - force default
+        else if(length(input.min.abundance) > 1)
+            {
+                warning("More than one minimum abundance value given - using first one")
+                CA$min.abundance = input.min.abundance[1]
+            }
+	else
+		{CA$min.abundance = input.min.abundance}	#Else - use it
+
+	if (!is.numeric(input.min.samples))	#check if the User entered a valid threshold1
 		{
-		bins <- floor(sqrt(length(CA$x)))					#If a vector - take sqrt of the length	
-		} else { 
-		bins <- floor(sqrt(nrow(CA$x))) 					#Set the default number of bins 
+		warning('\nMinimum samples must be numeric - using default=0.1\n')
+		CA$min.samples = 0.1 				#If it is not valid - force default
 		}
-		
-	if (!is.na(input.bins))								#If User entered number of Bins
-		if (suppressWarnings(!is.na(as.numeric(input.bins))))	#check if the User entered a numeric number of bins
-			{	
-			bins = input.bins					#Valid Input from the User - Use it		
-			} else 
-			{
-			warning('Invalid number of bins entered - Using default bins = sqrt(Number of rows) ')
-			}
+	else if (input.min.samples <= 0 || input.min.samples >= 1)	#check if the User entered a valid threshold1
+		{
+		warning('\nMinimum samples must be between 0 and 1 inclusive - using default=0.1\n')
+		CA$min.samples = 0.1 				#If it is not valid - force default
+		}
+        else if (length(input.min.samples) > 1)
+            {
+                warning("More than one min.samples value given - using first value")
+                CA$min.samples <- input.min.samples[1]
+            }
+	else
+		{CA$min.samples = input.min.samples}	#Else - use it
 
-
-			
-	CA$bins = bins										#Post it to Common Area
-	CA$n.bins = bins									#Claculate the number of bins
-	return(CA)
+	return(CA)								#Return the common Area
 }
-qc_filter <-
-function(data,CA) {
-#********************************************************************************************
-#*  	quality control: select species with >= 1E-4 relative abundance in >= 10% of samples*
-#********************************************************************************************
-	tmp <- {}
-	names <- {}
-	CA$names.of.cols.failing.qc <- {} 			#Names of the cols failing QC
-	CA$original.column.names <- colnames(data)	#These are the original column names
-	
-	CA$input.total.cols <- ncol(data)			#number of cols in the input
-	CA$columns.not.passing.qc = vector()		#define a vector to contain the seq number of cols that did not pass qc
 
-	
 
-	for (i in seq_len(ncol(data))) 
-	{
-		if (length(which(data[,i] >= CA$min.abundance)) >= CA$min.samples*nrow(data))
-		{
-			tmp <- cbind(tmp, data[,i])
-			names <- c(names, colnames(data)[i])
-		} else 
-		{
-			CA$names.of.cols.failing.qc<-c(CA$names.of.cols.failing.qc, colnames(data)[i])
-			CA$columns.not.passing.qc <- c(CA$columns.not.passing.qc,i)		#Add the number of the col that did not pass
-			warning_msg <- paste("Column ",i,":  ",colnames(data)[i]," - doesn't pass quality control: try adjusting min.samples or min.abundance")
-			warning(warning_msg)
-		}
-	}
-  
-  colnames(tmp) <- names					#Post the column names
-  rownames(tmp) <- rownames(data)			#Post the data row names
-  CA$x <- tmp								#Post in the common area
-  return(CA)								#Return the common Area
-}

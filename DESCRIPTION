@@ -1,7 +1,7 @@
 Package: ccrepe
 Type: Package
 Title: ccrepe_and_nc.score
-Version: 1.29.0
+Version: 1.30.0
 Imports: infotheo (>= 1.1)
 Date: 2014-10-29
 Author: Emma Schwager <emh146@mail.harvard.edu>,Craig Bielski<craig.bielski@gmail.com>, George Weingart<george.weingart@gmail.com>
